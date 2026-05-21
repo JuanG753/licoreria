@@ -1,23 +1,21 @@
+import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
-DB_CONFIG = {
-    "dbname": "licoreria",
-    "user": "postgres",
-    "password": "juan",
-    "host": "127.0.0.1",
-    "port": "5432"
-}
+# 1. Conexión a la base de datos
+# Busca la URL en Render primero, si no existe usa la configuración de tu computadora local
+SQLALCHEMY_DATABASE_URL = os.getenv(
+    "DATABASE_URL", 
+    "postgresql://postgres:juan@127.0.0.1:5432/licoreria"
+)
 
-SQLALCHEMY_DATABASE_URL = f"postgresql://{DB_CONFIG['user']}:{DB_CONFIG['password']}@{DB_CONFIG['host']}:{DB_CONFIG['port']}/{DB_CONFIG['dbname']}"
-
-
+# 2. Configuración del Motor
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
-
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+# 3. Dependencia para inyectar la base de datos en las rutas
 def get_db():
     db = SessionLocal()
     try:
@@ -25,12 +23,7 @@ def get_db():
     finally:
         db.close()
 
-from sqlalchemy import create_engine, text 
-
-
-engine = create_engine(SQLALCHEMY_DATABASE_URL)
-
-
+# 4. Prueba automática al iniciar la API
 try:
     with engine.connect() as conn:
         print("\n" + "="*40)
@@ -50,6 +43,3 @@ try:
         print("="*40 + "\n")
 except Exception as e:
     print(f"\n❌ Error al conectar: {e}\n")
-# ------------------------------------
-
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

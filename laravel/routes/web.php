@@ -9,25 +9,29 @@ Route::get('/login', function () {
     return view('login');
 })->name('login');
 
-// Proceso de validación (Habla con Python)
 Route::post('/login', function (Request $request) {
     $cedula = $request->input('cedula');
     $password = $request->input('password');
 
-    
     try {
-        $response = Http::post('http://127.0.0.1:8000/auth/login', [
+        
+        $url = env('API_URL', 'https://api-licoreria.onrender.com') . '/auth/login';
+
+      
+        $response = Http::withoutVerifying()->post($url, [
             'cedula' => $cedula,
             'password' => $password
         ]);
 
         if ($response->successful()) {
-            
             $trabajador = $response->json();
             session(['trabajador' => $trabajador]);
             return redirect('/');
         }
     } catch (\Exception $e) {
+       
+        \Log::error('Error de Login API: ' . $e->getMessage()); 
+        
         return back()->withErrors(['error' => 'No se pudo conectar con el servidor de seguridad.']);
     }
 
