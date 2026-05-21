@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Caja - Licorería</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 flex h-screen" style="font-family: sans-serif;">
+
+    <div style="width: 60%; padding: 20px; display: flex; flex-direction: column; height: 100vh;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h1 style="font-size: 24px; font-weight: bold;">Caja Registradora</h1>
+            <div style="display: flex; gap: 15px; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 8px; background: #f3f4f6; padding: 6px 12px; border-radius: 12px; border: 1px solid #d1d5db;">
+                    <span style="font-size: 14px; font-weight: bold; color: #4b5563;">Tasa $:</span>
+                    <input type="number" id="input-tasa" step="0.01" style="width: 80px; padding: 2px 6px; border-radius: 6px; border: 1px solid #cbd5e1; outline: none; font-weight: bold; text-align: center;">
+                    <button onclick="cambiarTasa()" style="background: #2563eb; color: white; padding: 4px 12px; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer; border: none;">Actualizar</button>
+                </div>
+                <span style="background: #dbeafe; color: #1e40af; padding: 5px 15px; border-radius: 20px; font-weight: bold;">
+                    Cajero: {{ session('trabajador')['nombre'] ?? 'Invitado' }}
+                </span>
+                <a href="/logout" style="background: #ef4444; color: white; padding: 5px 15px; border-radius: 20px; font-weight: bold; text-decoration: none; font-size: 14px; transition: 0.2s;" onmouseover="this.style.background='#dc2626'" onmouseout="this.style.background='#ef4444'">
+                    🚪 Cerrar Sesión
+                </a>
+            </div>
+        </div>
+        
+        <div style="margin-top: 20px;">
+            <input type="text" id="buscador" onkeyup="filtrarProductos()" placeholder="Buscar producto por nombre..." 
+                   style="width: 100%; padding: 15px; font-size: 16px; border: 2px solid #ccc; border-radius: 10px; outline: none;">
+        </div>
+
+        <hr style="margin: 20px 0;">
+
+        <div id="lista-productos" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; overflow-y: auto; padding-right: 10px;">
+        </div>
+    </div>
+
+    <div style="width: 40%; background: white; padding: 20px; border-left: 2px solid #ccc; display: flex; flex-direction: column; height: 100vh;">
+        <h2 style="font-size: 22px; font-weight: bold; text-align: center; background: #1f2937; color: white; padding: 10px; border-radius: 8px;">
+            Ticket Actual
+        </h2>
+
+        <div style="margin-top: 15px; padding: 15px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; display: flex; flex-direction: column; gap: 10px;">
+            <h3 style="font-weight: bold; color: #374151; font-size: 14px;">Datos de Facturación</h3>
+            <div style="display: flex; gap: 10px;">
+                <div style="flex: 1;">
+                    <label style="font-size: 12px; color: #6b7280; font-weight: bold; display: block; margin-bottom: 4px;">Cédula / ID Cliente</label>
+                    <input type="number" id="cliente-id" value="1" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; outline: none;">
+                </div>
+                <div style="flex: 1;">
+                    <label style="font-size: 12px; color: #6b7280; font-weight: bold; display: block; margin-bottom: 4px;">Método de Pago</label>
+                    <select id="metodo-id" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; outline: none; background: white;">
+                        <option value="1">Efectivo (1)</option>
+                        <option value="2">Débito (2)</option>
+                        <option value="3">Pago Móvil (3)</option>
+                        <option value="4">Divisas (4)</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        
+        <div id="carrito-items" style="flex-grow: 1; margin-top: 20px; overflow-y: auto;">
+            <p style="color: #888; text-align: center; margin-top: 50px;">El carrito está vacío</p>
+        </div>
+        
+        <div style="border-top: 2px solid #eee; padding-top: 20px; margin-top: auto;">
+            <div style="display: flex; justify-content: space-between; font-size: 24px; font-weight: bold; margin-bottom: 20px;">
+                <span>Total:</span>
+                <span id="total">$0.00</span>
+            </div>
+            <button onclick="procesarPago()" style="background: #22c55e; color: white; padding: 15px; width: 100%; border-radius: 10px; font-size: 18px; font-weight: bold; border: none; cursor: pointer;">
+                 Procesar Pago
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let inventario = [];
+        let carrito = [];
+
+        async function cargarDatosIniciales() {
+            try {
+                const resTasa = await fetch('http://127.0.0.1:8000/tasa');
+                if (resTasa.ok) {
+                    const dataTasa = await resTasa.json();
+                    document.getElementById('input-tasa').value = dataTasa.tasa;
+                }
+                const resProd = await fetch('http://127.0.0.1:8000/productos');
+                if (resProd.ok) {
+                    inventario = await resProd.json();
+                    cargarProductos(inventario);
+                }
+            } catch (e) {
+                console.error("Error cargando datos iniciales:", e);
+            }
+        }
+
+        async function cambiarTasa() {
+            const valor = document.getElementById('input-tasa').value;
+            if (!valor || valor <= 0) return alert("Ingresa una tasa válida.");
+            try {
+                const res = await fetch('http://127.0.0.1:8000/tasa', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ valor_bs: parseFloat(valor) })
+                });
+                if (res.ok) {
+                    alert("Tasa de cambio actualizada en la base de datos.");
+                } else {
+                    alert("No se pudo actualizar la tasa.");
+                }
+            } catch (e) {
+                alert("Error de conexión al cambiar la tasa.");
+            }
+        }
+
+        function cargarProductos(listaParaMostrar) {
+            const contenedor = document.getElementById('lista-productos');
+            contenedor.innerHTML = '';
+            if (listaParaMostrar.length === 0) {
+                contenedor.innerHTML = '<p style="grid-column: span 3; text-align: center; color: #888;">No se encontraron productos.</p>';
+                return;
+            }
+            listaParaMostrar.forEach(p => {
+                contenedor.innerHTML += `
+                    <div onclick="agregar(${p.id})" style="background: #fff; padding: 20px; border: 2px solid #e5e7eb; border-radius: 12px; cursor: pointer; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05); transition: 0.2s;" onmouseover="this.style.borderColor='#3b82f6'" onmouseout="this.style.borderColor='#e5e7eb'">
+                        <div style="font-size: 40px; margin-bottom: 10px;">${p.icono}</div>
+                        <h3 style="font-weight: bold; font-size: 16px; color: #374151; margin-bottom: 5px;">${p.nombre}</h3>
+                        <p style="color: #16a34a; font-weight: bold; font-size: 18px;">$${p.precio.toFixed(2)}</p>
+                    </div>
+                `;
+            });
+        }
+
+        function filtrarProductos() {
+            const textoBusqueda = document.getElementById('buscador').value.toLowerCase();
+            const productosFiltrados = inventario.filter(producto => 
+                producto.nombre.toLowerCase().includes(textoBusqueda)
+            );
+            cargarProductos(productosFiltrados);
+        }
+
+        function agregar(id) {
+            const producto = inventario.find(item => item.id === id);
+            const existente = carrito.find(item => item.id === id);
+            if (existente) {
+                existente.cantidad += 1;
+            } else {
+                carrito.push({ ...producto, cantidad: 1 });
+            }
+            actualizarTicket();
+        }
+
+        function actualizarTicket() {
+            const div = document.getElementById('carrito-items');
+            div.innerHTML = '';
+            let total = 0;
+            if(carrito.length === 0) {
+                div.innerHTML = '<p style="color: #888; text-align: center; margin-top: 50px;">El carrito está vacío</p>';
+                document.getElementById('total').innerText = '$0.00';
+                return;
+            }
+            carrito.forEach((item, index) => {
+                const subtotal = item.precio * item.cantidad;
+                total += subtotal;
+                div.innerHTML += `
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f3f4f6;">
+                        <span style="font-weight: bold; color: #374151;">${item.icono} ${item.nombre} <span style="color: #2563eb;">(x${item.cantidad})</span></span>
+                        <div style="display: flex; align-items: center;">
+                            <span style="font-weight: bold; margin-right: 15px;">$${subtotal.toFixed(2)}</span>
+                            <button onclick="quitarDelCarrito(${index})" style="background: #ef4444; color: white; border: none; border-radius: 5px; cursor: pointer; padding: 2px 8px;">X</button>
+                        </div>
+                    </div>`;
+            });
+            document.getElementById('total').innerText = '$' + total.toFixed(2);
+        }
+
+        function quitarDelCarrito(index) {
+            carrito.splice(index, 1);
+            actualizarTicket();
+        }
+
+        async function procesarPago() {
+            if(carrito.length === 0) return alert("Agrega productos primero.");
+            
+            const clientId = parseInt(document.getElementById('cliente-id').value);
+            const methodId = parseInt(document.getElementById('metodo-id').value);
+            
+            if(!clientId) return alert("Por favor, introduce un ID de cliente válido.");
+
+            try {
+                const res = await fetch('http://127.0.0.1:8000/ventas', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        trabajador_id: {{ session('trabajador')['id'] ?? 1 }},
+                        cliente_id: clientId,
+                        metodo_id: methodId,
+                        productos: carrito,
+                        total: carrito.reduce((s, i) => s + (i.precio * i.cantidad), 0)
+                    })
+                });
+                if(res.ok) {
+                    alert("¡Venta enviada con éxito!");
+                    carrito = [];
+                    actualizarTicket();
+                } else {
+                    alert("Error en el servidor de Python.");
+                }
+            } catch(e) {
+                alert("Error al conectar con la API.");
+            }
+        }
+
+        window.addEventListener('beforeunload', function () {
+            navigator.sendBeacon('/logout');
+        });
+
+        window.onload = cargarDatosIniciales;
+    </script>
+</body>
+</html>

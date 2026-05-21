@@ -1,0 +1,11 @@
+# Ignorar configuraciones locales y claves
+.env
+# Ignorar basura de Python
+__pycache__/
+*.pyc
+# Ignorar dependencias pesadas de Laravel
+/vendor
+/node_modules
+# Ignorar logs y archivos temporales
+storage/*.key
+*.log
