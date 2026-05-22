@@ -17,7 +17,7 @@ async def obtener_tasa(db: Session = Depends(get_db)):
 @router.post("/tasa")
 async def actualizar_tasa(datos: dict, db: Session = Depends(get_db)):
     try:
-        nueva_tasa = datos.get("valor_bs")
+        nueva_tasa = datos.get("tasa")
         if not nueva_tasa:
             raise HTTPException(status_code=400, detail="Valor inválido")
         query = text("""
