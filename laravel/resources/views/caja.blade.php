@@ -78,79 +78,63 @@
     </div>
 
     <script>
+        const API_BASE = window.location.hostname === 'localhost' 
+            ? 'http://127.0.0.1:8000' 
+            : 'https://api-licoreria.onrender.com';
+
         let inventario = [];
         let carrito = [];
 
         async function cargarDatosIniciales() {
             try {
-                const resTasa = await fetch('http://127.0.0.1:8000/tasa');
+                const resTasa = await fetch(`${API_BASE}/tasa`);
                 if (resTasa.ok) {
                     const dataTasa = await resTasa.json();
                     document.getElementById('input-tasa').value = dataTasa.tasa;
                 }
-                const resProd = await fetch('http://127.0.0.1:8000/productos');
+                const resProd = await fetch(`${API_BASE}/productos`);
                 if (resProd.ok) {
                     inventario = await resProd.json();
                     cargarProductos(inventario);
                 }
-            } catch (e) {
-                console.error("Error cargando datos iniciales:", e);
-            }
+            } catch (e) { console.error(e); }
         }
 
         async function cambiarTasa() {
             const valor = document.getElementById('input-tasa').value;
             if (!valor || valor <= 0) return alert("Ingresa una tasa válida.");
             try {
-                const res = await fetch('http://127.0.0.1:8000/tasa', {
+                const res = await fetch(`${API_BASE}/tasa`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ valor_bs: parseFloat(valor), tasa: parseFloat(valor) })
                 });
-                if (res.ok) {
-                    alert("Tasa de cambio actualizada en la base de datos.");
-                } else {
-                    alert("No se pudo actualizar la tasa.");
-                }
-            } catch (e) {
-                alert("Error de conexión al cambiar la tasa.");
-            }
+                if (res.ok) alert("Tasa actualizada.");
+            } catch (e) { alert("Error de conexión."); }
         }
 
-        function cargarProductos(listaParaMostrar) {
+        function cargarProductos(lista) {
             const contenedor = document.getElementById('lista-productos');
             contenedor.innerHTML = '';
-            if (listaParaMostrar.length === 0) {
-                contenedor.innerHTML = '<p style="grid-column: span 3; text-align: center; color: #888;">No se encontraron productos.</p>';
-                return;
-            }
-            listaParaMostrar.forEach(p => {
+            lista.forEach(p => {
                 contenedor.innerHTML += `
                     <div onclick="agregar(${p.id})" style="background: #fff; padding: 20px; border: 2px solid #e5e7eb; border-radius: 12px; cursor: pointer; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05); transition: 0.2s;" onmouseover="this.style.borderColor='#3b82f6'" onmouseout="this.style.borderColor='#e5e7eb'">
                         <div style="font-size: 40px; margin-bottom: 10px;">${p.icono}</div>
                         <h3 style="font-weight: bold; font-size: 16px; color: #374151; margin-bottom: 5px;">${p.nombre}</h3>
                         <p style="color: #16a34a; font-weight: bold; font-size: 18px;">$${p.precio.toFixed(2)}</p>
-                    </div>
-                `;
+                    </div>`;
             });
         }
 
         function filtrarProductos() {
-            const textoBusqueda = document.getElementById('buscador').value.toLowerCase();
-            const productosFiltrados = inventario.filter(producto => 
-                producto.nombre.toLowerCase().includes(textoBusqueda)
-            );
-            cargarProductos(productosFiltrados);
+            const txt = document.getElementById('buscador').value.toLowerCase();
+            cargarProductos(inventario.filter(p => p.nombre.toLowerCase().includes(txt)));
         }
 
         function agregar(id) {
-            const producto = inventario.find(item => item.id === id);
-            const existente = carrito.find(item => item.id === id);
-            if (existente) {
-                existente.cantidad += 1;
-            } else {
-                carrito.push({ ...producto, cantidad: 1 });
-            }
+            const p = inventario.find(i => i.id === id);
+            const e = carrito.find(i => i.id === id);
+            e ? e.cantidad++ : carrito.push({ ...p, cantidad: 1 });
             actualizarTicket();
         }
 
@@ -158,117 +142,63 @@
             const div = document.getElementById('carrito-items');
             div.innerHTML = '';
             let total = 0;
-            if(carrito.length === 0) {
-                div.innerHTML = '<p style="color: #888; text-align: center; margin-top: 50px;">El carrito está vacío</p>';
-                document.getElementById('total').innerText = '$0.00';
-                return;
-            }
             carrito.forEach((item, index) => {
-                const subtotal = item.precio * item.cantidad;
-                total += subtotal;
+                total += item.precio * item.cantidad;
                 div.innerHTML += `
                     <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f3f4f6;">
-                        <span style="font-weight: bold; color: #374151;">${item.icono} ${item.nombre} <span style="color: #2563eb;">(x${item.cantidad})</span></span>
+                        <span style="font-weight: bold; color: #374151;">${item.icono} ${item.nombre} (x${item.cantidad})</span>
                         <div style="display: flex; align-items: center;">
-                            <span style="font-weight: bold; margin-right: 15px;">$${subtotal.toFixed(2)}</span>
-                            <button onclick="quitarDelCarrito(${index})" style="background: #ef4444; color: white; border: none; border-radius: 5px; cursor: pointer; padding: 2px 8px;">X</button>
+                            <span style="font-weight: bold; margin-right: 15px;">$${(item.precio * item.cantidad).toFixed(2)}</span>
+                            <button onclick="carrito.splice(${index}, 1); actualizarTicket();" style="background: #ef4444; color: white; border: none; border-radius: 5px; cursor: pointer; padding: 2px 8px;">X</button>
                         </div>
                     </div>`;
             });
             document.getElementById('total').innerText = '$' + total.toFixed(2);
         }
 
-        function quitarDelCarrito(index) {
-            carrito.splice(index, 1);
-            actualizarTicket();
-        }
-
         async function verificarCliente() {
-            const idInput = document.getElementById('cliente-id').value;
-            const inputNombre = document.getElementById('cliente-nombre');
-            const mensaje = document.getElementById('mensaje-cliente');
-
-            if (!idInput) {
-                mensaje.innerText = '';
-                inputNombre.style.display = 'none';
-                return;
-            }
-
-            mensaje.style.color = '#3b82f6';
-            mensaje.innerText = 'Buscando cliente...';
-
+            const id = document.getElementById('cliente-id').value;
+            const inputN = document.getElementById('cliente-nombre');
+            const msj = document.getElementById('mensaje-cliente');
+            if (!id) { msj.innerText = ''; inputN.style.display = 'none'; return; }
             try {
-                const res = await fetch(`http://127.0.0.1:8000/clientes/${idInput}`);
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.existe) {
-                        mensaje.style.color = '#16a34a'; 
-                        mensaje.innerText = `✅ ${data.nombre}`;
-                        inputNombre.style.display = 'none';
-                        inputNombre.value = data.nombre;
-                    } else {
-                        mensaje.style.color = '#ef4444';
-                        mensaje.innerText = '⚠️ Cliente no registrado';
-                        inputNombre.style.display = 'block';
-                        inputNombre.value = '';
-                        inputNombre.focus();
-                    }
+                const res = await fetch(`${API_BASE}/clientes/${id}`);
+                const data = await res.json();
+                if (data.existe) {
+                    msj.style.color = '#16a34a'; msj.innerText = `✅ ${data.nombre}`;
+                    inputN.style.display = 'none'; inputN.value = data.nombre;
                 } else {
-                    mensaje.style.color = '#ef4444';
-                    mensaje.innerText = 'Error al verificar.';
+                    msj.style.color = '#ef4444'; msj.innerText = '⚠️ Cliente no registrado';
+                    inputN.style.display = 'block'; inputN.value = ''; inputN.focus();
                 }
-            } catch (e) {
-                mensaje.style.color = '#ef4444';
-                mensaje.innerText = 'Error de conexión.';
-            }
+            } catch (e) { msj.innerText = 'Error.'; }
         }
 
         async function procesarPago() {
-            if(carrito.length === 0) return alert("Agrega productos primero.");
-            
-            const clientId = parseInt(document.getElementById('cliente-id').value);
-            const methodId = parseInt(document.getElementById('metodo-id').value);
+            if(carrito.length === 0) return alert("Agrega productos.");
             const clientNombre = document.getElementById('cliente-nombre').value;
-            const inputNombreVisible = document.getElementById('cliente-nombre').style.display === 'block';
-            
-            if(!clientId) return alert("Por favor, introduce un ID de cliente válido.");
-
-            if (inputNombreVisible && clientNombre.trim() === '') {
-                return alert("¡Alto! Debes ingresar el nombre del cliente nuevo.");
-            }
-
+            if (document.getElementById('cliente-nombre').style.display === 'block' && !clientNombre) return alert("Nombre obligatorio.");
             try {
-                const res = await fetch('http://127.0.0.1:8000/ventas', {
+                const res = await fetch(`${API_BASE}/ventas`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
                         trabajador_id: {{ session('trabajador')['id'] ?? 1 }},
-                        cliente_id: clientId,
+                        cliente_id: parseInt(document.getElementById('cliente-id').value),
                         cliente_nombre: clientNombre,
-                        metodo_id: methodId,
+                        metodo_id: parseInt(document.getElementById('metodo-id').value),
                         productos: carrito,
                         total: carrito.reduce((s, i) => s + (i.precio * i.cantidad), 0)
                     })
                 });
                 if(res.ok) {
-                    alert("¡Venta enviada con éxito!");
-                    carrito = [];
-                    actualizarTicket();
+                    alert("¡Venta exitosa!");
+                    carrito = []; actualizarTicket();
                     document.getElementById('cliente-id').value = '';
-                    document.getElementById('cliente-nombre').value = '';
                     document.getElementById('cliente-nombre').style.display = 'none';
-                    document.getElementById('mensaje-cliente').innerText = '';
-                } else {
-                    alert("Error en el servidor de Python.");
                 }
-            } catch(e) {
-                alert("Error al conectar con la API.");
-            }
+            } catch(e) { alert("Error de conexión."); }
         }
-
-        window.addEventListener('beforeunload', function () {
-            navigator.sendBeacon('/logout');
-        });
 
         window.onload = cargarDatosIniciales;
     </script>
