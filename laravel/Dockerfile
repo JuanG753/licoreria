@@ -1,5 +1,5 @@
 # Usamos una versión ligera de PHP
-FROM php:8.2-cli
+FROM php:8.3-cli
 
 # Instalamos herramientas necesarias para Laravel
 RUN apt-get update && apt-get install -y git unzip libzip-dev && docker-php-ext-install zip
