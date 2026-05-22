@@ -10,6 +10,11 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # Nos movemos a la carpeta de trabajo
 WORKDIR /app
 
+# ... (lo que ya tienes)
+WORKDIR /app
+# AGREGA ESTA LÍNEA AQUÍ:
+COPY laravel/ .
+
 # Copiamos todo tu código de Laravel al servidor
 COPY . .
 
