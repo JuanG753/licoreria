@@ -18,6 +18,8 @@ RUN composer install --no-dev --optimize-autoloader
 # ... (todo lo anterior igual)
 RUN composer install --no-dev --optimize-autoloader
 RUN chmod -R 777 storage bootstrap/cache
+# ... después de la línea de CHMOD ...
+RUN mkdir -p database && touch database/database.sqlite && chmod 666 database/database.sqlite
 
 # FORZAMOS LAS VARIABLES AQUÍ AL ARRANCAR
 CMD php artisan config:clear && php artisan route:clear && php artisan serve --host=0.0.0.0 --port=$PORT
