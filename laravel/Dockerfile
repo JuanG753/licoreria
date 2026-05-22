@@ -15,4 +15,9 @@ RUN mkdir -p storage/framework/{sessions,views,cache} storage/logs bootstrap/cac
 
 RUN composer install --no-dev --optimize-autoloader
 
-CMD php artisan serve --host=0.0.0.0 --port=$PORT
+# ... (todo lo anterior igual)
+RUN composer install --no-dev --optimize-autoloader
+RUN chmod -R 777 storage bootstrap/cache
+
+# FORZAMOS LAS VARIABLES AQUÍ AL ARRANCAR
+CMD php artisan config:clear && php artisan route:clear && php artisan serve --host=0.0.0.0 --port=$PORT
