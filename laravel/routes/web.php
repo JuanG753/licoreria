@@ -36,10 +36,7 @@ Route::post('/login', function (Request $request) {
 
 // Ruta de la Caja (Protegida)
 Route::get('/', function () {
-    if (!session()->has('trabajador')) {
-        return redirect('/login');
-    }
-    return view('caja');
+    return view('test');
 });
 
 // Cerrar Sesión
