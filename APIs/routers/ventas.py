@@ -23,13 +23,17 @@ async def procesar_venta(datos_venta: dict, db: Session = Depends(get_db)):
         existe_cliente = db.execute(query_cliente, {"id_cli": id_cliente}).scalar()
 
         if not existe_cliente:
+        
+            nombre_recibido = datos_venta.get("cliente_nombre")
+            nombre_final = nombre_recibido if nombre_recibido else f"Cliente C.I. {id_cliente}"
+
             query_crear_cliente = text("""
                 INSERT INTO cliente (id_cliente, nombre) 
                 VALUES (:id_cli, :nombre)
             """)
             db.execute(query_crear_cliente, {
                 "id_cli": id_cliente,
-                "nombre": f"Cliente C.I. {id_cliente}"
+                "nombre": nombre_final 
             })
 
         query_factura = text("""

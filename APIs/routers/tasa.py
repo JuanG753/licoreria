@@ -30,3 +30,17 @@ async def actualizar_tasa(datos: dict, db: Session = Depends(get_db)):
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    
+@router.get("/clientes/{id_cliente}")
+async def verificar_cliente(id_cliente: int, db: Session = Depends(get_db)):
+    try:
+        query = text("SELECT nombre FROM cliente WHERE id_cliente = :id")
+        nombre = db.execute(query, {"id": id_cliente}).scalar()
+        
+        if nombre:
+            return {"existe": True, "nombre": nombre}
+        else:
+            return {"existe": False}
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
