@@ -46,7 +46,9 @@
             <div style="display: flex; gap: 10px;">
                 <div style="flex: 1;">
                     <label style="font-size: 12px; color: #6b7280; font-weight: bold; display: block; margin-bottom: 4px;">Cédula / ID Cliente</label>
-                    <input type="number" id="cliente-id" value="1" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; outline: none;">
+                    <input type="number" id="cliente-id" onchange="verificarCliente()" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; outline: none; margin-bottom: 4px;" placeholder="Ej: 27123456">
+                    <span id="mensaje-cliente" style="font-size: 12px; font-weight: bold; margin-bottom: 8px; display: block; color: #6b7280;"></span>
+                    <input type="text" id="cliente-nombre" placeholder="¡Cliente Nuevo! Nombre (Obligatorio)" style="width: 100%; padding: 8px; border: 2px solid #ef4444; border-radius: 6px; outline: none; font-size: 14px; display: none;">
                 </div>
                 <div style="flex: 1;">
                     <label style="font-size: 12px; color: #6b7280; font-weight: bold; display: block; margin-bottom: 4px;">Método de Pago</label>
@@ -103,7 +105,7 @@
                 const res = await fetch('http://127.0.0.1:8000/tasa', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ valor_bs: parseFloat(valor) })
+                    body: JSON.stringify({ valor_bs: parseFloat(valor), tasa: parseFloat(valor) })
                 });
                 if (res.ok) {
                     alert("Tasa de cambio actualizada en la base de datos.");
@@ -181,13 +183,59 @@
             actualizarTicket();
         }
 
+        async function verificarCliente() {
+            const idInput = document.getElementById('cliente-id').value;
+            const inputNombre = document.getElementById('cliente-nombre');
+            const mensaje = document.getElementById('mensaje-cliente');
+
+            if (!idInput) {
+                mensaje.innerText = '';
+                inputNombre.style.display = 'none';
+                return;
+            }
+
+            mensaje.style.color = '#3b82f6';
+            mensaje.innerText = 'Buscando cliente...';
+
+            try {
+                const res = await fetch(`http://127.0.0.1:8000/clientes/${idInput}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.existe) {
+                        mensaje.style.color = '#16a34a'; 
+                        mensaje.innerText = `✅ ${data.nombre}`;
+                        inputNombre.style.display = 'none';
+                        inputNombre.value = data.nombre;
+                    } else {
+                        mensaje.style.color = '#ef4444';
+                        mensaje.innerText = '⚠️ Cliente no registrado';
+                        inputNombre.style.display = 'block';
+                        inputNombre.value = '';
+                        inputNombre.focus();
+                    }
+                } else {
+                    mensaje.style.color = '#ef4444';
+                    mensaje.innerText = 'Error al verificar.';
+                }
+            } catch (e) {
+                mensaje.style.color = '#ef4444';
+                mensaje.innerText = 'Error de conexión.';
+            }
+        }
+
         async function procesarPago() {
             if(carrito.length === 0) return alert("Agrega productos primero.");
             
             const clientId = parseInt(document.getElementById('cliente-id').value);
             const methodId = parseInt(document.getElementById('metodo-id').value);
+            const clientNombre = document.getElementById('cliente-nombre').value;
+            const inputNombreVisible = document.getElementById('cliente-nombre').style.display === 'block';
             
             if(!clientId) return alert("Por favor, introduce un ID de cliente válido.");
+
+            if (inputNombreVisible && clientNombre.trim() === '') {
+                return alert("¡Alto! Debes ingresar el nombre del cliente nuevo.");
+            }
 
             try {
                 const res = await fetch('http://127.0.0.1:8000/ventas', {
@@ -196,6 +244,7 @@
                     body: JSON.stringify({
                         trabajador_id: {{ session('trabajador')['id'] ?? 1 }},
                         cliente_id: clientId,
+                        cliente_nombre: clientNombre,
                         metodo_id: methodId,
                         productos: carrito,
                         total: carrito.reduce((s, i) => s + (i.precio * i.cantidad), 0)
@@ -205,6 +254,10 @@
                     alert("¡Venta enviada con éxito!");
                     carrito = [];
                     actualizarTicket();
+                    document.getElementById('cliente-id').value = '';
+                    document.getElementById('cliente-nombre').value = '';
+                    document.getElementById('cliente-nombre').style.display = 'none';
+                    document.getElementById('mensaje-cliente').innerText = '';
                 } else {
                     alert("Error en el servidor de Python.");
                 }
